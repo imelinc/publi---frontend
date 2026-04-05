@@ -1,27 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* publi design system */
+    --primary: 193 100% 36%;        /* #0095b6 */
+    --primary-light: 193 67% 87%;   /* #cceef5 */
+    --accent: 42 100% 51%;          /* #ffb703 */
+    --background: 0 0% 98%;
+    --foreground: 220 20% 12%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 220 10% 50%;
+    --border: 210 20% 90%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 12%;
+    --radius: 0.75rem;
+
+    /* shadcn overrides */
+    --ring: 193 100% 36%;
+    --input: 210 20% 90%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Poppins', sans-serif;
   }
 }
