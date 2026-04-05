@@ -43,3 +43,6 @@ coverage/
 # Misc
 *.log
 .cache/
+
+CLAUDE.md
+AGENTS.md
