@@ -42,19 +42,6 @@ Abrí [http://localhost:3000](http://localhost:3000) en el navegador.
 
 ---
 
-## Estructura del proyecto
-src/
-├── app/
-│   ├── (auth)/           # Pantallas de autenticación
-│   └── (dashboard)/      # Pantallas principales de la app
-├── components/
-│   ├── ui/               # Componentes base (shadcn)
-│   └── publi/            # Componentes propios del producto
-├── lib/                  # Utilidades y datos mock
-└── store/                # Estado global (Zustand)
-
----
-
 ## Estado del proyecto
 
 > Prototipo funcional — MVP frontend con datos hardcodeados.  
