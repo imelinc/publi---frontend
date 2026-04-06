@@ -1,27 +1,37 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+
+const valueProps = [
+  "Todos tus clientes, un solo lugar",
+  "Publicaciones programadas sin esfuerzo",
+  "Métricas unificadas en tiempo real",
+]
 
 export default function LoginPage() {
   const router = useRouter()
 
   return (
     <div className="flex min-h-screen">
-      {/* Panel izquierdo — oculto en mobile */}
-      <div className="hidden md:flex md:w-1/2 bg-primary relative overflow-hidden flex-col items-center justify-center px-12">
-        {/* Arco decorativo grande */}
-        <div className="absolute w-[600px] h-[600px] rounded-full border-4 border-white/20 -bottom-48 -right-48" />
-        {/* Círculos flotantes */}
-        <div className="absolute w-8 h-8 rounded-full bg-white/10 top-16 right-20" />
-        <div className="absolute w-4 h-4 rounded-full bg-accent/30 top-32 left-16" />
-        <div className="absolute w-3 h-3 rounded-full bg-white/20 bottom-24 left-32" />
 
-        {/* Contenido de marca */}
+      {/* ── Panel izquierdo (brand) ── */}
+      <div className="hidden md:flex md:w-1/2 bg-primary relative overflow-hidden flex-col items-center justify-center px-12">
+
+        {/* Decoración geométrica */}
+        <div className="absolute w-[500px] h-[500px] rounded-full border-[40px] border-white/5 -bottom-40 -right-40" />
+        <div className="absolute w-72 h-72 rounded-full border-[20px] border-white/5 -top-20 -left-20" />
+        <div className="absolute w-8 h-8 rounded-full bg-white/10 top-20 right-24" />
+        <div className="absolute w-4 h-4 rounded-full bg-accent/30 top-40 left-20" />
+        <div className="absolute w-3 h-3 rounded-full bg-white/20 bottom-32 left-36" />
+        <div className="absolute w-24 h-px bg-white/10 top-1/3 right-16 rotate-45" />
+        <div className="absolute w-16 h-px bg-white/10 bottom-1/3 left-20 -rotate-12" />
+
+        {/* Contenido */}
         <div className="relative z-10 text-center">
           <h1 className="text-6xl font-bold text-white tracking-tight mb-2">
             publi
@@ -32,19 +42,26 @@ export default function LoginPage() {
 
           <div className="w-12 h-px bg-white/30 mx-auto mb-8" />
 
-          <ul className="space-y-3 text-white/70 text-sm font-light">
-            <li>Todos tus clientes, un solo lugar</li>
-            <li>Programá contenido sin perder el hilo</li>
-            <li>Tu calendario social, siempre bajo control</li>
+          <ul className="space-y-4 text-left">
+            {valueProps.map((text) => (
+              <li key={text} className="flex items-center gap-3">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
+                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                </span>
+                <span className="text-white/80 text-sm font-light">{text}</span>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
 
-      {/* Panel derecho — formulario */}
+      {/* ── Panel derecho (formulario) ── */}
       <div className={cn(
-        "flex flex-col items-center justify-center",
-        "w-full md:w-1/2 bg-background px-8 relative"
+        "flex flex-col items-center justify-center relative",
+        "w-full md:w-1/2 bg-background px-8"
       )}>
+
+        {/* Volver al inicio */}
         <button
           onClick={() => router.push("/")}
           className="absolute top-6 left-6 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -54,17 +71,18 @@ export default function LoginPage() {
         </button>
 
         <div className="w-full max-w-sm">
-          {/* Logo visible solo en mobile */}
-          <div className="md:hidden text-center mb-8">
-            <h1 className="text-4xl font-bold text-primary">publi</h1>
-            <p className="text-muted-foreground text-sm mt-1">Managing Communities</p>
+          {/* Logo */}
+          <div className="mb-8">
+            <span className="text-2xl font-bold text-primary tracking-tight">
+              publi
+            </span>
           </div>
 
           <h2 className="text-2xl font-semibold text-foreground mb-1">
-            Bienvenido de vuelta
+            Bienvenido de nuevo
           </h2>
           <p className="text-muted-foreground text-sm mb-8">
-            Ingresá a tu cuenta para continuar
+            Ingresá tus credenciales para continuar
           </p>
 
           <div className="space-y-5">
@@ -95,6 +113,13 @@ export default function LoginPage() {
               Ingresar
             </Button>
           </div>
+
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            ¿No tenés cuenta?{" "}
+            <button className="text-primary hover:underline font-medium">
+              Solicitá acceso
+            </button>
+          </p>
         </div>
       </div>
     </div>
