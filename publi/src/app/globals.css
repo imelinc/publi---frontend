@@ -19,6 +19,7 @@
     --card-foreground: 220 20% 12%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 12%;
+    --surface: 214 15% 98%;          /* #f8f9fa — fondo del contenido del dashboard */
     --radius: 0.75rem;
 
     /* shadcn overrides */
