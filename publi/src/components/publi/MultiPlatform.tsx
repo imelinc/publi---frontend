@@ -39,6 +39,11 @@ const platformCells = [
     name: "Threads",
     iconSrc: "/icons/threads-color.svg",
   },
+  {
+    type: "platform",
+    name: "Pinterest",
+    iconSrc: "/icons/pinterest-color.svg",
+  },
   { type: "text", title: "Cuentas ilimitadas por plataforma" },
   { type: "text", title: "Más plataformas próximamente" },
 ] as const;
