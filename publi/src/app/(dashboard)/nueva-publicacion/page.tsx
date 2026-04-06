@@ -116,7 +116,7 @@ export default function NuevaPublicacionPage() {
     return valid;
   }
 
-  function handleSubmit(mode: "schedule" | "draft") {
+  function handleSubmit() {
     if (!validate()) return;
     showToast();
     // Reset form
@@ -283,14 +283,14 @@ export default function NuevaPublicacionPage() {
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() => handleSubmit("draft")}
+                onClick={() => handleSubmit()}
                 className="w-full rounded-xl border border-[#e8f4f7] bg-white px-5 py-3 text-sm font-semibold text-foreground transition hover:bg-[#f5f0e8]"
               >
                 Guardar borrador
               </button>
               <button
                 type="button"
-                onClick={() => handleSubmit("schedule")}
+                onClick={() => handleSubmit()}
                 className="w-full rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
               >
                 Programar publicación
@@ -350,60 +350,6 @@ export default function NuevaPublicacionPage() {
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-function InstagramIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <rect x="4.5" y="4.5" width="15" height="15" rx="4" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="16.4" cy="7.6" r="1" fill="currentColor" />
-    </svg>
-  );
-}
-function FacebookIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path d="M13.2 20v-6h2.1l.4-2.4h-2.5V10c0-.7.2-1.2 1.3-1.2H16V6.6c-.3 0-1-.1-1.8-.1-1.8 0-3.1 1.1-3.1 3.3v1.8H9V14h2.1v6h2.1Z" fill="currentColor" />
-    </svg>
-  );
-}
-function TikTokIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path d="M13.7 4c.4 1.4 1.3 2.5 2.8 3.1.7.4 1.5.6 2.3.7v2.8a6.9 6.9 0 0 1-3.8-1.1v5.2a5 5 0 1 1-5-5c.3 0 .7 0 1 .1v2.9a2.3 2.3 0 1 0 1.7 2.2V4h3Z" fill="currentColor" />
-    </svg>
-  );
-}
-function LinkedInIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <rect x="4" y="4" width="16" height="16" rx="3" fill="currentColor" />
-      <circle cx="9" cy="9" r="1.3" fill="white" />
-      <path d="M8 11h2v5H8zm3.2 0h1.9v.8h.1c.3-.5 1-.9 1.9-.9 2 0 2.4 1.3 2.4 3v3.1h-2v-2.7c0-.7 0-1.6-1-1.6s-1.1.8-1.1 1.5V17h-2V11Z" fill="white" />
-    </svg>
-  );
-}
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path d="M6 4h4.3l4 5.2L18.7 4H20l-5 5.8L20.3 20H16l-4.2-5.6L7 20H5.7l5.4-6.2L6 4Zm2.3 1.6H7.4l8.4 12.8h.9L8.3 5.6Z" fill="currentColor" />
-    </svg>
-  );
-}
-function YouTubeIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <rect x="3.5" y="6" width="17" height="12" rx="4" fill="currentColor" />
-      <path d="m10 9.2 5 2.8-5 2.8V9.2Z" fill="white" />
-    </svg>
-  );
-}
-function ThreadsIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-      <path d="M14.7 11c-.2-1.8-1.4-2.9-3.3-2.9-2 0-3.5 1.4-3.5 3.5 0 1.8 1.2 3.1 2.9 3.1 1.3 0 2.2-.6 2.6-1.5.4.2.8.5 1 .8.2.2.3.5.3.9 0 1.1-1.2 2.1-3.2 2.1-2.5 0-4.3-1.8-4.3-4.5 0-3 2.1-5 5-5 2.7 0 4.4 1.6 4.7 4.2 1 .3 1.7 1 1.7 2.1 0 2-1.8 3.7-4.3 3.7h-.2v-1.6h.1c1.5 0 2.6-.8 2.6-1.8 0-.6-.3-1.1-1-1.4-.2 1.6-1.4 2.7-3.1 2.7-2 0-3.4-1.5-3.4-3.5 0-2.2 1.6-3.6 3.7-3.6 2 0 3.4 1.2 3.7 3.2Z" fill="currentColor" />
-    </svg>
-  );
-}
 function ImagePlaceholderIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
