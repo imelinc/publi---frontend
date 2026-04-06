@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .publi-marquee-track {
+    animation: publi-marquee 28s linear infinite;
+    width: max-content;
+  }
+
+  @keyframes publi-marquee {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+
+    to {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+}
+
 @layer base {
   :root {
     /* publi design system */
@@ -9,6 +26,7 @@
     --primary-light: 193 67% 87%;   /* #cceef5 */
     --accent: 42 100% 51%;          /* #ffb703 */
     --background: 0 0% 98%;
+    --hero-background: 36 33% 93%;
     --foreground: 220 20% 12%;
     --muted: 210 20% 96%;
     --muted-foreground: 220 10% 50%;
