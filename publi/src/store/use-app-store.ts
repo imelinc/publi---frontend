@@ -84,10 +84,10 @@ export const useAppStore = create<AppStore>((set) => ({
     },
   ],
   profile: {
-    name: "Ignacio Melinc",
+    name: "Usuario Demo",
     email: "ignacio@publi.com",
     role: "Community Manager Freelance",
-    avatarUrl: "https://api.dicebear.com/7.x/initials/svg?seed=Ignacio",
+    avatarUrl: "https://api.dicebear.com/7.x/initials/svg?seed=UsuarioDemo",
     joinedAt: new Date("2025-01-15"),
   },
   posts: [
