@@ -1,486 +1,381 @@
 "use client"
 
-import {
-  format,
-  formatRelative,
-  isToday,
-  isTomorrow,
-} from "date-fns"
-import { es } from "date-fns/locale"
-import {
-  Clock,
-  FileText,
-  Info,
-  Plus,
-  Users,
-  Wifi,
-} from "lucide-react"
-import { usePathname, useRouter } from "next/navigation"
-import * as React from "react"
+import { useEffect, useRef, useState } from "react"
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
-import { useAppStore, type Client } from "@/store/use-app-store"
-import type { PostStatus } from "@/store/use-app-store"
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type Platform = Client["platform"]
+type SocialNetwork = "Instagram" | "Facebook" | "TikTok" | "LinkedIn" | "X" | "YouTube"
+type Industry = "Gastronomía" | "Moda" | "Tecnología" | "Salud" | "Educación" | "Otro"
 
-const platformOptions: Array<{
-  value: Platform
-  label: string
-  icon: string
-  badgeClassName: string
-}> = [
+interface Client {
+  id: string
+  name: string
+  industry: string
+  platforms: SocialNetwork[]
+  posts: string
+  lastPost: string
+  headerColor: string
+  textColor: string
+}
+
+// ─── Static data ──────────────────────────────────────────────────────────────
+
+const INITIAL_CLIENTS: Client[] = [
   {
-    value: "instagram",
-    label: "Instagram",
-    icon: "/icons/instagram.svg",
-    badgeClassName: "bg-primary-light text-primary",
+    id: "1", name: "Neon Inc.", industry: "Tecnología",
+    platforms: ["Instagram", "Facebook", "LinkedIn"],
+    posts: "12 posts este mes", lastPost: "Última publicación: hace 1 día",
+    headerColor: "#cceef5", textColor: "#0095b6",
   },
   {
-    value: "facebook",
-    label: "Facebook",
-    icon: "/icons/facebook.svg",
-    badgeClassName: "bg-blue-100 text-blue-700",
+    id: "2", name: "Casa Nube", industry: "Moda",
+    platforms: ["Instagram", "TikTok"],
+    posts: "9 posts este mes", lastPost: "Última publicación: hace 2 días",
+    headerColor: "#dbeafe", textColor: "#0A66C2",
   },
   {
-    value: "linkedin",
-    label: "LinkedIn",
-    icon: "/icons/linkedin.svg",
-    badgeClassName: "bg-sky-100 text-sky-700",
+    id: "3", name: "Studio Lucia", industry: "Educación",
+    platforms: ["Instagram", "Facebook"],
+    posts: "15 posts este mes", lastPost: "Última publicación: hace 6 horas",
+    headerColor: "#fef3c7", textColor: "#92400e",
   },
   {
-    value: "tiktok",
-    label: "TikTok",
-    icon: "/icons/tiktok.svg",
-    badgeClassName: "bg-zinc-200 text-zinc-700",
+    id: "4", name: "Brava Home", industry: "Gastronomía",
+    platforms: ["Facebook", "LinkedIn", "X"],
+    posts: "7 posts este mes", lastPost: "Última publicación: hace 3 días",
+    headerColor: "#cceef5", textColor: "#0095b6",
   },
   {
-    value: "x",
-    label: "X",
-    icon: "/icons/twitter.svg",
-    badgeClassName: "bg-zinc-200 text-zinc-700",
+    id: "5", name: "Luma Fit", industry: "Salud",
+    platforms: ["TikTok", "Instagram", "YouTube"],
+    posts: "11 posts este mes", lastPost: "Última publicación: hace 1 día",
+    headerColor: "#e5e7eb", textColor: "#111827",
   },
 ]
 
-const statusStyles: Record<
-  PostStatus,
-  { label: string; className: string }
-> = {
-  programada: {
-    label: "Programada",
-    className: "bg-primary text-white",
-  },
-  publicada: {
-    label: "Publicada",
-    className: "bg-green-600 text-white",
-  },
-  fallida: {
-    label: "Fallida",
-    className: "bg-destructive text-destructive-foreground",
-  },
+const NETWORK_OPTIONS: SocialNetwork[] = ["Instagram", "Facebook", "TikTok", "LinkedIn", "X", "YouTube"]
+const INDUSTRY_OPTIONS: Industry[] = ["Gastronomía", "Moda", "Tecnología", "Salud", "Educación", "Otro"]
+
+function getInitials(name: string) {
+  return name.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase()
 }
 
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1)
+function headerColorForIndex(i: number): { headerColor: string; textColor: string } {
+  const colors = [
+    { headerColor: "#cceef5", textColor: "#0095b6" },
+    { headerColor: "#fef3c7", textColor: "#92400e" },
+    { headerColor: "#dbeafe", textColor: "#1e40af" },
+    { headerColor: "#d1fae5", textColor: "#065f46" },
+    { headerColor: "#ede9fe", textColor: "#5b21b6" },
+  ]
+  return colors[i % colors.length]
 }
 
-function truncateText(value: string, maxLength: number) {
-  const glyphs = Array.from(value)
-  return glyphs.length > maxLength
-    ? `${glyphs.slice(0, maxLength).join("")}...`
-    : value
+// ─── Toast ────────────────────────────────────────────────────────────────────
+
+function Toast({ message, visible }: { message: string; visible: boolean }) {
+  return (
+    <div
+      className="fixed top-6 right-6 z-[100] pointer-events-none"
+      style={{
+        transform: visible ? "translateX(0)" : "translateX(calc(100% + 32px))",
+        opacity: visible ? 1 : 0,
+        transition: "transform 300ms ease, opacity 300ms ease",
+      }}
+    >
+      <div className="rounded-lg px-5 py-3 text-sm font-semibold text-white shadow-xl" style={{ backgroundColor: "#0095b6" }}>
+        {message}
+      </div>
+    </div>
+  )
 }
 
-function formatNextPost(date: Date | null) {
-  if (!date) {
-    return "Sin programar"
-  }
-
-  if (isToday(date)) {
-    return `Hoy a las ${format(date, "HH:mm", { locale: es })}`
-  }
-
-  if (isTomorrow(date)) {
-    return `Mañana a las ${format(date, "HH:mm", { locale: es })}`
-  }
-
-  const relative = formatRelative(date, new Date(), { locale: es })
-  return capitalize(relative)
-}
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ClientesPage() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const clients = useAppStore((state) => state.clients)
-  const posts = useAppStore((state) => state.posts)
-  const addClient = useAppStore((state) => state.addClient)
-  const deleteClient = useAppStore((state) => state.deleteClient)
+  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [editNames, setEditNames] = useState<Record<string, string>>({})
+  const [toastMsg, setToastMsg] = useState("")
+  const [toastVisible, setToastVisible] = useState(false)
 
-  const [isAddModalOpen, setIsAddModalOpen] = React.useState<boolean>(false)
-  const [selectedClient, setSelectedClient] = React.useState<Client | null>(null)
-  const [clientName, setClientName] = React.useState<string>("")
-  const [clientUsername, setClientUsername] = React.useState<string>("")
-  const [clientPlatform, setClientPlatform] = React.useState<Platform>("instagram")
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalName, setModalName] = useState("")
+  const [modalIndustry, setModalIndustry] = useState<Industry | "">("")
+  const [modalPlatforms, setModalPlatforms] = useState<SocialNetwork[]>([])
+  const [modalError, setModalError] = useState("")
+  const modalRef = useRef<HTMLDivElement>(null)
 
-  const selectedClientPosts = React.useMemo(() => {
-    if (!selectedClient) {
-      return []
+  function showToast(msg: string) {
+    setToastMsg(msg)
+    setToastVisible(true)
+    setTimeout(() => setToastVisible(false), 3000)
+  }
+
+  function openModal() {
+    setModalName("")
+    setModalIndustry("")
+    setModalPlatforms([])
+    setModalError("")
+    setModalOpen(true)
+  }
+
+  function closeModal() {
+    setModalOpen(false)
+  }
+
+  function togglePlatform(p: SocialNetwork) {
+    setModalPlatforms((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    )
+  }
+
+  function submitModal() {
+    if (!modalName.trim()) { setModalError("El nombre es requerido."); return }
+    const colors = headerColorForIndex(clients.length)
+    const newClient: Client = {
+      id: Date.now().toString(),
+      name: modalName.trim(),
+      industry: modalIndustry || "Otro",
+      platforms: modalPlatforms,
+      posts: "0 posts este mes",
+      lastPost: "Sin publicaciones aún",
+      ...colors,
     }
-    return posts.filter((post) => post.account === selectedClient.username)
-  }, [posts, selectedClient])
+    setClients((prev) => [...prev, newClient])
+    closeModal()
+    showToast("Cliente agregado exitosamente")
+  }
 
-  const handleCreatePost = React.useCallback(() => {
-    router.push(`/nueva-publicacion?from=${encodeURIComponent(pathname)}`)
-  }, [pathname, router])
-
-  const resetAddClientForm = React.useCallback(() => {
-    setClientName("")
-    setClientUsername("")
-    setClientPlatform("instagram")
-  }, [])
-
-  const handleCloseAddModal = React.useCallback(() => {
-    setIsAddModalOpen(false)
-    resetAddClientForm()
-  }, [resetAddClientForm])
-
-  const handleAddClient = React.useCallback(() => {
-    const nextName = clientName.trim()
-    const nextUsername = clientUsername.trim()
-
-    if (!nextName || !nextUsername) {
-      return
+  function toggleExpand(id: string, currentName: string) {
+    if (expandedId === id) {
+      setExpandedId(null)
+    } else {
+      setExpandedId(id)
+      setEditNames((prev) => ({ ...prev, [id]: currentName }))
     }
+  }
 
-    addClient({
-      id: crypto.randomUUID(),
-      name: nextName,
-      avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-        nextName
-      )}`,
-      platform: clientPlatform,
-      username: nextUsername,
-      postsCount: 0,
-      nextPost: null,
-    })
+  function saveClientName(id: string) {
+    const newName = editNames[id]?.trim()
+    if (!newName) return
+    setClients((prev) => prev.map((c) => c.id === id ? { ...c, name: newName } : c))
+    setExpandedId(null)
+    showToast("Cambios guardados")
+  }
 
-    handleCloseAddModal()
-  }, [addClient, clientName, clientPlatform, clientUsername, handleCloseAddModal])
-
-  const handleOpenClientDetail = React.useCallback((client: Client) => {
-    setSelectedClient(client)
-  }, [])
-
-  const handleCloseClientDetail = React.useCallback(() => {
-    setSelectedClient(null)
-  }, [])
-
-  const handleDeleteClient = React.useCallback(() => {
-    if (!selectedClient) {
-      return
+  // Close modal on outside click
+  useEffect(() => {
+    function onOutside(e: MouseEvent) {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
+        closeModal()
+      }
     }
-
-    deleteClient(selectedClient.id)
-    setSelectedClient(null)
-  }, [deleteClient, selectedClient])
+    if (modalOpen) document.addEventListener("mousedown", onOutside)
+    return () => document.removeEventListener("mousedown", onOutside)
+  }, [modalOpen])
 
   return (
-    <div className="space-y-6">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-foreground">Clientes</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Gestioná las cuentas de tus clientes
-          </p>
-        </div>
-        <Button size="lg" className="w-full sm:w-auto" onClick={() => setIsAddModalOpen(true)}>
-          <Plus className="mr-1 h-4 w-4" />
-          Agregar cliente
-        </Button>
-      </section>
+    <main className="min-h-screen bg-[#f5f0e8] p-6 md:p-8">
+      <Toast message={toastMsg} visible={toastVisible} />
 
-      {clients.length === 0 ? (
-        <section className="flex min-h-[360px] items-center justify-center rounded-3xl border border-border bg-card p-8 text-center">
-          <div className="max-w-md">
-            <Users className="mx-auto h-16 w-16 text-muted-foreground" />
-            <h2 className="mt-4 text-xl font-semibold text-foreground">
-              No tenés clientes agregados
+      {/* Modal */}
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.4)" }}
+        >
+          <div
+            ref={modalRef}
+            className="w-full max-w-[480px] rounded-2xl bg-white p-8"
+            style={{ border: "1px solid #e8f4f7" }}
+          >
+            <h2 className="text-xl font-bold mb-6" style={{ color: "#1a1a2e" }}>
+              Agregar nuevo cliente
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Agregá tu primer cliente para empezar a gestionar su contenido
-            </p>
-            <Button className="mt-6" onClick={() => setIsAddModalOpen(true)}>
-              Agregar cliente
-            </Button>
+
+            <div className="flex flex-col gap-4">
+              {/* Name */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium" style={{ color: "#1a1a2e" }}>Nombre del cliente *</label>
+                <input
+                  type="text"
+                  value={modalName}
+                  onChange={(e) => { setModalName(e.target.value); setModalError("") }}
+                  placeholder="Ej: Neon Inc."
+                  className="rounded-lg border px-4 py-3 text-sm outline-none transition"
+                  style={{ borderColor: modalError ? "#dc2626" : "#cceef5", color: "#1a1a2e" }}
+                  onFocus={(e) => (e.target.style.borderColor = "#0095b6")}
+                  onBlur={(e) => (e.target.style.borderColor = modalError ? "#dc2626" : "#cceef5")}
+                />
+                {modalError && <span className="text-xs" style={{ color: "#dc2626" }}>{modalError}</span>}
+              </div>
+
+              {/* Industry */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium" style={{ color: "#1a1a2e" }}>Industria</label>
+                <select
+                  value={modalIndustry}
+                  onChange={(e) => setModalIndustry(e.target.value as Industry)}
+                  className="rounded-lg border px-4 py-3 text-sm outline-none"
+                  style={{ borderColor: "#cceef5", color: "#1a1a2e" }}
+                >
+                  <option value="">Seleccioná una industria</option>
+                  {INDUSTRY_OPTIONS.map((ind) => (
+                    <option key={ind} value={ind}>{ind}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Platforms */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium" style={{ color: "#1a1a2e" }}>Redes a conectar</label>
+                <div className="flex flex-wrap gap-2">
+                  {NETWORK_OPTIONS.map((net) => (
+                    <button
+                      key={net}
+                      type="button"
+                      onClick={() => togglePlatform(net)}
+                      className="rounded-full border px-3 py-1.5 text-xs font-medium transition"
+                      style={{
+                        backgroundColor: modalPlatforms.includes(net) ? "#0095b6" : "transparent",
+                        borderColor: modalPlatforms.includes(net) ? "#0095b6" : "#cceef5",
+                        color: modalPlatforms.includes(net) ? "white" : "#6b7280",
+                      }}
+                    >
+                      {net}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 flex gap-3 justify-end">
+              <button
+                onClick={closeModal}
+                className="rounded-xl border px-5 py-3 text-sm font-semibold transition hover:bg-[#f5f0e8]"
+                style={{ borderColor: "#e8f4f7", color: "#6b7280" }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitModal}
+                className="rounded-xl px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+                style={{ backgroundColor: "#0095b6" }}
+              >
+                Agregar cliente
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      <div className="mx-auto max-w-7xl space-y-8">
+        <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-[-0.03em] text-foreground">Clientes</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Organizá tus marcas y sus redes desde un solo lugar.</p>
+          </div>
+          <button
+            type="button"
+            onClick={openModal}
+            className="rounded-xl px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+            style={{ backgroundColor: "#0095b6" }}
+          >
+            + Nuevo cliente
+          </button>
         </section>
-      ) : (
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+
+        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {clients.map((client) => {
-            const platformData = platformOptions.find(
-              (option) => option.value === client.platform
-            )
+            const isExpanded = expandedId === client.id
+            const initials = getInitials(client.name)
 
             return (
               <article
                 key={client.id}
-                className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+                className="overflow-hidden rounded-xl border border-[#e8f4f7] bg-white transition hover:border-[#0095b6] hover:shadow-[0_14px_40px_-28px_rgba(0,149,182,0.45)]"
               >
-                <div className="flex items-start gap-4">
-                  <div className="relative">
-                    <Avatar className="h-14 w-14 border border-border">
-                      <AvatarImage src={client.avatarUrl} alt={client.name} />
-                      <AvatarFallback>{client.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    {platformData ? (
-                      <div className="absolute -bottom-1 -right-1 rounded-full border border-card bg-card p-1">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={platformData.icon}
-                          alt={platformData.label}
-                          className="h-4 w-4"
-                        />
-                      </div>
-                    ) : null}
+                <div className="flex h-[60px] items-center justify-center" style={{ backgroundColor: client.headerColor }}>
+                  <span className="text-2xl font-bold" style={{ color: client.textColor }}>{initials}</span>
+                </div>
+                <div className="p-5">
+                  <h2 className="text-base font-bold text-foreground">{client.name}</h2>
+                  {client.industry && (
+                    <span className="mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: "#f5f0e8", color: "#6b7280" }}>
+                      {client.industry}
+                    </span>
+                  )}
+                  <div className="mt-3 flex items-center gap-2 text-muted-foreground flex-wrap">
+                    {client.platforms.map((p) => (
+                      <PlatformBadge key={p} name={p} />
+                    ))}
+                  </div>
+                  <div className="mt-4 space-y-1">
+                    <p className="text-sm text-muted-foreground">{client.posts}</p>
+                    <p className="text-sm text-muted-foreground">{client.lastPost}</p>
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-base font-semibold text-foreground">
-                      {client.name}
-                    </h3>
-                    <p className="truncate text-sm text-muted-foreground">{client.username}</p>
-                  </div>
-                </div>
-
-                <Separator className="my-4" />
-
-                <div className="space-y-2 text-sm">
-                  <p className="flex items-center gap-2 text-foreground">
-                    <FileText className="h-4 w-4 text-primary" />
-                    {client.postsCount} publicaciones
-                  </p>
-                  <p className="flex items-center gap-2 text-foreground">
-                    <Clock className="h-4 w-4 text-primary" />
-                    {formatNextPost(client.nextPost)}
-                  </p>
-                  <p className="flex items-center gap-2 text-green-600">
-                    <Wifi className="h-4 w-4" />
-                    Conectado
-                  </p>
-                </div>
-
-                <div className="mt-5 grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleOpenClientDetail(client)}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(client.id, client.name)}
+                    className="mt-5 w-full rounded-xl border px-4 py-3 text-sm font-semibold transition"
+                    style={{
+                      borderColor: "#0095b6",
+                      backgroundColor: isExpanded ? "#0095b6" : "white",
+                      color: isExpanded ? "white" : "#0095b6",
+                    }}
                   >
-                    Ver detalle
-                  </Button>
-                  <Button className="w-full" onClick={handleCreatePost}>
-                    Nueva pub.
-                  </Button>
+                    {isExpanded ? "Cerrar" : "Ver cliente"}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-4 flex flex-col gap-2 border-t border-[#e8f4f7] pt-4">
+                      <label className="text-xs font-medium" style={{ color: "#6b7280" }}>Nombre del cliente</label>
+                      <input
+                        type="text"
+                        value={editNames[client.id] ?? client.name}
+                        onChange={(e) => setEditNames((prev) => ({ ...prev, [client.id]: e.target.value }))}
+                        className="w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                        style={{ borderColor: "#cceef5", color: "#1a1a2e" }}
+                        onFocus={(e) => (e.target.style.borderColor = "#0095b6")}
+                        onBlur={(e) => (e.target.style.borderColor = "#cceef5")}
+                      />
+                      <button
+                        onClick={() => saveClientName(client.id)}
+                        className="rounded-lg py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                        style={{ backgroundColor: "#0095b6" }}
+                      >
+                        Guardar cambios
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
             )
           })}
         </section>
-      )}
+      </div>
+    </main>
+  )
+}
 
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Agregar cliente</DialogTitle>
-            <DialogDescription>
-              Conectá una nueva cuenta para gestionar su contenido
-            </DialogDescription>
-          </DialogHeader>
+// ─── Platform badge ───────────────────────────────────────────────────────────
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="client-name">Nombre</Label>
-              <Input
-                id="client-name"
-                value={clientName}
-                placeholder="Ej: Café El Molino"
-                onChange={(event) => setClientName(event.target.value)}
-                className="h-10"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="client-username">Usuario</Label>
-              <Input
-                id="client-username"
-                value={clientUsername}
-                placeholder="Ej: @cafeelmolino"
-                onChange={(event) => setClientUsername(event.target.value)}
-                className="h-10"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Red social</Label>
-              <Select
-                value={clientPlatform}
-                onValueChange={(value) => setClientPlatform(value as Platform)}
-              >
-                <SelectTrigger className="h-10 w-full">
-                  <SelectValue placeholder="Seleccioná la red social" />
-                </SelectTrigger>
-                <SelectContent>
-                  {platformOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <span className="flex items-center gap-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={option.icon} alt={option.label} className="h-4 w-4" />
-                        {option.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-start gap-2 rounded-xl bg-muted p-3">
-              <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                La conexión real con la red social estará disponible próximamente. Por ahora el
-                cliente se agrega como placeholder.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={handleCloseAddModal}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleAddClient}
-              disabled={!clientName.trim() || !clientUsername.trim()}
-            >
-              Agregar cliente
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={Boolean(selectedClient)} onOpenChange={(open) => !open && handleCloseClientDetail()}>
-        <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-4xl xl:max-w-5xl max-h-[85vh] overflow-y-auto p-6 sm:p-8">
-          {selectedClient ? (
-            <>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:pr-10">
-                <div className="flex min-w-0 items-center gap-3">
-                  <Avatar className="h-14 w-14 border border-border">
-                    <AvatarImage src={selectedClient.avatarUrl} alt={selectedClient.name} />
-                    <AvatarFallback>
-                      {selectedClient.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <h3 className="truncate text-lg font-semibold text-foreground">
-                      {selectedClient.name}
-                    </h3>
-                    <p className="truncate text-sm text-muted-foreground">
-                      {selectedClient.username}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge
-                    className={cn(
-                      "border border-transparent",
-                      platformOptions.find((option) => option.value === selectedClient.platform)
-                        ?.badgeClassName
-                    )}
-                  >
-                    {platformOptions.find((option) => option.value === selectedClient.platform)?.label}
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    className="border-destructive/30 text-destructive hover:bg-destructive/10 sm:ml-auto"
-                    onClick={handleDeleteClient}
-                  >
-                    Eliminar cliente
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              <section className="space-y-3">
-                <h4 className="text-sm font-semibold text-foreground">
-                  Publicaciones programadas
-                </h4>
-
-                {selectedClientPosts.length > 0 ? (
-                  <div className="space-y-2">
-                    {selectedClientPosts.map((post) => (
-                      <article
-                        key={post.id}
-                        className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 sm:p-4"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={post.imageUrl}
-                          alt="Imagen de publicación"
-                          className="h-12 w-12 rounded-lg object-cover"
-                        />
-
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm text-foreground">
-                            {truncateText(post.caption, 60)}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {capitalize(
-                              format(post.scheduledAt, "EEEE d 'de' MMMM 'a las' HH:mm", {
-                                locale: es,
-                              })
-                            )}
-                          </p>
-                        </div>
-
-                        <Badge className={statusStyles[post.status].className}>
-                          {statusStyles[post.status].label}
-                        </Badge>
-                      </article>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-border bg-surface p-4">
-                    <p className="text-sm text-muted-foreground">
-                      Este cliente no tiene publicaciones programadas
-                    </p>
-                    <Button className="mt-3" onClick={handleCreatePost}>
-                      Crear publicación
-                    </Button>
-                  </div>
-                )}
-              </section>
-            </>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-    </div>
+function PlatformBadge({ name }: { name: SocialNetwork }) {
+  const colors: Record<SocialNetwork, { bg: string; text: string }> = {
+    Instagram: { bg: "#fce7f3", text: "#9d174d" },
+    Facebook: { bg: "#dbeafe", text: "#1e40af" },
+    TikTok: { bg: "#f3f4f6", text: "#111827" },
+    LinkedIn: { bg: "#dbeafe", text: "#1e3a5f" },
+    X: { bg: "#f3f4f6", text: "#111827" },
+    YouTube: { bg: "#fee2e2", text: "#991b1b" },
+  }
+  const c = colors[name]
+  return (
+    <span className="rounded-full px-2 py-0.5 text-[11px] font-medium" style={{ backgroundColor: c.bg, color: c.text }}>
+      {name}
+    </span>
   )
 }

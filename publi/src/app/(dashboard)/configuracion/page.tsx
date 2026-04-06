@@ -78,6 +78,7 @@ export default function ConfiguracionPage() {
   }, [router, toast])
 
   return (
+    <div className="min-h-screen bg-[#f5f0e8] p-6 md:p-8">
     <div className="mx-auto w-full max-w-[680px] space-y-5">
       <section>
         <h1 className="text-3xl font-semibold text-foreground">Configuración</h1>
@@ -367,6 +368,7 @@ export default function ConfiguracionPage() {
           </div>
         </CardContent>
       </Card>
+    </div>
     </div>
   )
 }

@@ -1,540 +1,298 @@
-"use client"
+"use client";
 
-import {
-  eachDayOfInterval,
-  endOfMonth,
-  endOfWeek,
-  format,
-  getHours,
-  isSameDay,
-  isSameMonth,
-  isToday,
-  startOfMonth,
-  startOfWeek,
-  addMonths,
-  subMonths,
-  addWeeks,
-  subWeeks,
-} from "date-fns"
-import { es } from "date-fns/locale"
-import {
-  CalendarX,
-  ChevronLeft,
-  ChevronRight,
-  ImageIcon,
-  Plus,
-} from "lucide-react"
-import { usePathname, useRouter } from "next/navigation"
-import * as React from "react"
+import { useMemo, useState } from "react";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Separator } from "@/components/ui/separator"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { cn } from "@/lib/utils"
-import { useAppStore, type Post, type PostStatus } from "@/store/use-app-store"
+type ViewMode = "mensual" | "semanal";
+type Platform = "instagram" | "facebook" | "tiktok" | "linkedin";
 
-type ViewMode = "mensual" | "semanal"
-
-const WEEK_DAYS = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"] as const
-const WEEK_HOURS = Array.from({ length: 15 }, (_, index) => index + 8)
-
-const statusConfig: Record<
-  PostStatus,
-  {
-    label: string
-    chipClassName: string
-    cardClassName: string
-    badgeVariant: "default" | "success" | "destructive"
-  }
-> = {
-  programada: {
-    label: "Programada",
-    chipClassName: "bg-primary text-white",
-    cardClassName: "bg-primary/15 text-foreground border-primary/40",
-    badgeVariant: "default",
-  },
-  publicada: {
-    label: "Publicada",
-    chipClassName: "bg-green-600 text-white",
-    cardClassName: "bg-green-600/15 text-foreground border-green-600/40",
-    badgeVariant: "success",
-  },
-  fallida: {
-    label: "Fallida",
-    chipClassName: "bg-destructive text-destructive-foreground",
-    cardClassName: "bg-destructive/15 text-foreground border-destructive/40",
-    badgeVariant: "destructive",
-  },
+interface CalendarPost {
+  id: string;
+  title: string;
+  day: number;
+  time: string;
+  platform: Platform;
 }
 
-function capitalize(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1)
+const dayLabels = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"] as const;
+
+// Posts hardcodeados — se muestran en cualquier mes
+const posts: CalendarPost[] = [
+  { id: "1", title: "Campaña otoño", day: 3, time: "09:00", platform: "instagram" },
+  { id: "2", title: "Promo stories", day: 5, time: "11:30", platform: "facebook" },
+  { id: "3", title: "Tip del día", day: 8, time: "16:00", platform: "tiktok" },
+  { id: "4", title: "Caso de éxito", day: 12, time: "10:15", platform: "linkedin" },
+  { id: "5", title: "Lanzamiento reel", day: 14, time: "18:30", platform: "instagram" },
+  { id: "6", title: "Post institucional", day: 18, time: "13:00", platform: "facebook" },
+  { id: "7", title: "Behind the scenes", day: 22, time: "17:00", platform: "tiktok" },
+  { id: "8", title: "Resultados Q1", day: 27, time: "08:45", platform: "linkedin" },
+];
+
+const MONTH_NAMES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+/** Retorna el índice del día de la semana (0=Lu … 6=Do) para el 1ro del mes */
+function firstWeekdayOfMonth(year: number, month: number): number {
+  const jsDay = new Date(year, month, 1).getDay(); // 0=Dom
+  return jsDay === 0 ? 6 : jsDay - 1; // convertir a Lu=0
 }
 
-function formatMonthTitle(date: Date) {
-  return capitalize(format(date, "MMMM yyyy", { locale: es }))
-}
-
-function formatWeekTitle(date: Date) {
-  const weekStart = startOfWeek(date, { weekStartsOn: 1 })
-  const weekEnd = endOfWeek(date, { weekStartsOn: 1 })
-  const monthAndYear = capitalize(format(weekStart, "MMMM yyyy", { locale: es }))
-  return `${format(weekStart, "d")} - ${format(weekEnd, "d")} de ${monthAndYear}`
-}
-
-function truncateText(value: string, limit: number) {
-  const glyphs = Array.from(value)
-  return glyphs.length > limit ? `${glyphs.slice(0, limit).join("")}...` : value
-}
-
-function EmptyState({ onCreatePost }: { onCreatePost: () => void }) {
-  return (
-    <div className="flex min-h-[380px] items-center justify-center rounded-3xl border border-border bg-card p-8">
-      <div className="max-w-md text-center">
-        <CalendarX className="mx-auto h-16 w-16 text-muted-foreground" />
-        <h3 className="mt-5 text-xl font-semibold text-foreground">
-          No hay publicaciones para este periodo
-        </h3>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Crea una nueva publicacion para verla aca
-        </p>
-        <Button className="mt-6" size="lg" onClick={onCreatePost}>
-          Nueva publicacion
-        </Button>
-      </div>
-    </div>
-  )
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
 }
 
 export default function CalendarioPage() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const posts = useAppStore((state) => state.posts)
-  const accounts = useAppStore((state) => state.accounts)
-  const deletePost = useAppStore((state) => state.deletePost)
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth()); // 0-based
+  const [viewMode, setViewMode] = useState<ViewMode>("mensual");
+  const [activeDay, setActiveDay] = useState<number | null>(null);
 
-  const today = React.useMemo(() => new Date(), [])
-  const [activeDate, setActiveDate] = React.useState<Date>(today)
-  const [accountFilter, setAccountFilter] = React.useState<string>("all")
-  const [viewMode, setViewMode] = React.useState<ViewMode>("mensual")
-  const [selectedPost, setSelectedPost] = React.useState<Post | null>(null)
-  const [isModalOpen, setIsModalOpen] = React.useState<boolean>(false)
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth();
+  const today = isCurrentMonth ? now.getDate() : -1;
 
-  const goToNewPost = React.useCallback(() => {
-    router.push(`/nueva-publicacion?from=${encodeURIComponent(pathname)}`)
-  }, [pathname, router])
+  function prevMonth() {
+    if (month === 0) { setYear((y) => y - 1); setMonth(11); }
+    else setMonth((m) => m - 1);
+    setActiveDay(null);
+  }
 
-  const monthStart = startOfMonth(activeDate)
-  const monthEnd = endOfMonth(activeDate)
-  const monthGridStart = startOfWeek(monthStart, { weekStartsOn: 1 })
-  const monthGridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
-  const monthDays = eachDayOfInterval({ start: monthGridStart, end: monthGridEnd })
+  function nextMonth() {
+    if (month === 11) { setYear((y) => y + 1); setMonth(0); }
+    else setMonth((m) => m + 1);
+    setActiveDay(null);
+  }
 
-  const weekStart = startOfWeek(activeDate, { weekStartsOn: 1 })
-  const weekEnd = endOfWeek(activeDate, { weekStartsOn: 1 })
-  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
+  const monthLabel = `${MONTH_NAMES[month]} ${year}`;
+  const totalDays = daysInMonth(year, month);
+  const startOffset = firstWeekdayOfMonth(year, month);
 
-  const filteredPosts = React.useMemo(() => {
-    if (accountFilter === "all") {
-      return posts
-    }
-    return posts.filter((post) => post.account === accountFilter)
-  }, [accountFilter, posts])
+  // Grilla: celdas vacías al inicio + días del mes
+  const gridCells = useMemo(() => {
+    const cells: Array<{ day: number | null }> = [];
+    for (let i = 0; i < startOffset; i++) cells.push({ day: null });
+    for (let d = 1; d <= totalDays; d++) cells.push({ day: d });
+    // Rellenar hasta múltiplo de 7
+    while (cells.length % 7 !== 0) cells.push({ day: null });
+    return cells;
+  }, [startOffset, totalDays]);
 
-  const monthPosts = React.useMemo(() => {
-    return filteredPosts.filter(
-      (post) =>
-        post.scheduledAt >= monthStart &&
-        post.scheduledAt <= monthEnd
-    )
-  }, [filteredPosts, monthEnd, monthStart])
+  const postsByDay = useMemo(() => {
+    return posts.reduce<Record<number, CalendarPost[]>>((acc, post) => {
+      acc[post.day] = [...(acc[post.day] ?? []), post];
+      return acc;
+    }, {});
+  }, []);
 
-  const weekPosts = React.useMemo(() => {
-    return filteredPosts.filter(
-      (post) =>
-        post.scheduledAt >= weekStart &&
-        post.scheduledAt <= weekEnd
-    )
-  }, [filteredPosts, weekEnd, weekStart])
+  // Vista semanal: semana que contiene el día activo (o la primera semana)
+  const weekStart = useMemo(() => {
+    const baseDay = activeDay ?? 1;
+    const jsDay = new Date(year, month, baseDay).getDay();
+    const lunesOffset = jsDay === 0 ? 6 : jsDay - 1;
+    return new Date(year, month, baseDay - lunesOffset);
+  }, [activeDay, year, month]);
 
-  const openPostModal = React.useCallback((post: Post) => {
-    setSelectedPost(post)
-    setIsModalOpen(true)
-  }, [])
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      return d;
+    });
+  }, [weekStart]);
 
-  const handleDeletePost = React.useCallback(() => {
-    if (!selectedPost) {
-      return
-    }
-    deletePost(selectedPost.id)
-    setIsModalOpen(false)
-    setSelectedPost(null)
-  }, [deletePost, selectedPost])
-
-  const handleMonthNavigation = React.useCallback(
-    (direction: "prev" | "next") => {
-      setActiveDate((value) =>
-        direction === "prev" ? subMonths(value, 1) : addMonths(value, 1)
-      )
-    },
-    []
-  )
-
-  const handleWeekNavigation = React.useCallback(
-    (direction: "prev" | "next") => {
-      setActiveDate((value) =>
-        direction === "prev" ? subWeeks(value, 1) : addWeeks(value, 1)
-      )
-    },
-    []
-  )
+  const weeklyPosts: Array<{ dayIndex: number; title: string; time: string; platform: Platform }> = [
+    { dayIndex: 0, title: "Campaña otoño", time: "09:00", platform: "instagram" },
+    { dayIndex: 1, title: "Promo stories", time: "11:30", platform: "facebook" },
+    { dayIndex: 2, title: "Tip del día", time: "16:00", platform: "tiktok" },
+    { dayIndex: 4, title: "Caso de éxito", time: "10:15", platform: "linkedin" },
+    { dayIndex: 5, title: "Reel destacado", time: "18:30", platform: "instagram" },
+  ];
 
   return (
-    <div className="space-y-6">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-foreground">Calendario</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Visualiza y gestiona tus publicaciones programadas
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Select value={accountFilter} onValueChange={setAccountFilter}>
-            <SelectTrigger className="h-10 w-full rounded-xl bg-card px-3 sm:w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las cuentas</SelectItem>
-              {accounts.map((account) => (
-                <SelectItem key={account.id} value={account.username}>
-                  {account.username}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="hidden rounded-xl border border-border bg-card p-1 md:flex">
-            <button
-              type="button"
-              onClick={() => setViewMode("mensual")}
-              className={cn(
-                "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                viewMode === "mensual"
-                  ? "bg-primary text-white"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Mensual
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("semanal")}
-              className={cn(
-                "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
-                viewMode === "semanal"
-                  ? "bg-primary text-white"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Semanal
-            </button>
+    <main className="min-h-screen bg-[#f5f0e8] p-6 md:p-8">
+      <div className="mx-auto max-w-7xl space-y-8">
+        <section className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-[-0.03em] text-foreground">
+              Calendario
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Visualizá tu planificación por mes o por semana.
+            </p>
           </div>
 
-          <Button className="h-10 rounded-xl px-4" onClick={goToNewPost}>
-            <Plus className="mr-1 h-4 w-4" />
-            Nueva publicacion
-          </Button>
-        </div>
-      </section>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3 rounded-xl border border-[#e8f4f7] bg-white px-4 py-3">
+              <button type="button" onClick={prevMonth} className="rounded-lg p-1 text-muted-foreground transition hover:bg-[#f5f0e8] hover:text-foreground">
+                <ChevronLeftIcon className="h-4 w-4" />
+              </button>
+              <span className="min-w-[140px] text-center text-sm font-semibold text-foreground">
+                {monthLabel}
+              </span>
+              <button type="button" onClick={nextMonth} className="rounded-lg p-1 text-muted-foreground transition hover:bg-[#f5f0e8] hover:text-foreground">
+                <ChevronRightIcon className="h-4 w-4" />
+              </button>
+            </div>
 
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-sm sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            onClick={() =>
-              viewMode === "mensual"
-                ? handleMonthNavigation("prev")
-                : handleWeekNavigation("prev")
-            }
-          >
-            <ChevronLeft />
-          </Button>
-
-          <p className="text-lg font-semibold text-foreground">
-            {viewMode === "mensual"
-              ? formatMonthTitle(activeDate)
-              : formatWeekTitle(activeDate)}
-          </p>
-
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setActiveDate(today)}
-            >
-              Hoy
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={() =>
-                viewMode === "mensual"
-                  ? handleMonthNavigation("next")
-                  : handleWeekNavigation("next")
-              }
-            >
-              <ChevronRight />
-            </Button>
+            <div className="flex rounded-full bg-white p-1 ring-1 ring-[#e8f4f7]">
+              <button
+                type="button"
+                onClick={() => setViewMode("mensual")}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  viewMode === "mensual"
+                    ? "bg-primary text-white"
+                    : "bg-transparent text-muted-foreground"
+                }`}
+              >
+                Mensual
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("semanal")}
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  viewMode === "semanal"
+                    ? "bg-primary text-white"
+                    : "bg-transparent text-muted-foreground"
+                }`}
+              >
+                Semanal
+              </button>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <>
-          <div className={cn("space-y-3", viewMode === "semanal" && "md:hidden")}>
-            {monthPosts.length === 0 ? (
-              <EmptyState onCreatePost={goToNewPost} />
-            ) : (
-              <>
+        <section className="rounded-xl border border-[#e8f4f7] bg-white p-4 md:p-6">
+          {viewMode === "mensual" ? (
+            <div>
               <div className="grid grid-cols-7 gap-2">
-                {WEEK_DAYS.map((day) => (
+                {dayLabels.map((label) => (
                   <div
-                    key={`month-header-${day}`}
-                    className="rounded-xl bg-surface py-2 text-center text-xs font-semibold text-muted-foreground"
+                    key={label}
+                    className="py-2 text-center text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
                   >
-                    {day}
+                    {label}
                   </div>
                 ))}
               </div>
 
-              <div className="grid grid-cols-7 gap-2">
-                {monthDays.map((day) => {
-                  const dayPosts = filteredPosts
-                    .filter((post) => isSameDay(post.scheduledAt, day))
-                    .sort(
-                      (a, b) =>
-                        a.scheduledAt.getTime() - b.scheduledAt.getTime()
-                    )
-                  const visiblePosts = dayPosts.slice(0, 2)
-                  const remainingCount = dayPosts.length - visiblePosts.length
+              <div className="mt-2 grid grid-cols-7 gap-2">
+                {gridCells.map((cell, i) => {
+                  const dayPosts = cell.day ? postsByDay[cell.day] ?? [] : [];
+                  const isToday = cell.day === today;
+                  const isActive = cell.day !== null && cell.day === activeDay;
 
                   return (
-                    <div
-                      key={day.toISOString()}
-                      className={cn(
-                        "min-h-28 rounded-xl border border-border p-2",
-                        isToday(day) && "bg-primary-light/70",
-                        !isSameMonth(day, monthStart) && "bg-surface text-muted-foreground/70"
-                      )}
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => cell.day && setActiveDay(cell.day)}
+                      disabled={cell.day === null}
+                      className={`min-h-[100px] rounded-xl border p-3 text-left transition ${
+                        cell.day === null
+                          ? "border-transparent bg-transparent cursor-default"
+                          : isActive
+                          ? "border-primary bg-[#f0fafc]"
+                          : "border-[#e8f4f7] bg-white hover:border-primary/40"
+                      }`}
                     >
-                      <p
-                        className={cn(
-                          "text-right text-xs text-muted-foreground",
-                          isToday(day) && "font-semibold text-primary"
-                        )}
-                      >
-                        {format(day, "d")}
-                      </p>
-
-                      <div className="mt-2 space-y-1">
-                        {visiblePosts.map((post) => (
-                          <button
-                            key={post.id}
-                            type="button"
-                            onClick={() => openPostModal(post)}
-                            className={cn(
-                              "block w-full rounded-md px-2 py-1 text-left text-[11px] font-medium text-white",
-                              statusConfig[post.status].chipClassName
+                      {cell.day !== null && (
+                        <>
+                          <div className="flex items-center">
+                            {isToday ? (
+                              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">
+                                {cell.day}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-medium text-muted-foreground">
+                                {cell.day}
+                              </span>
                             )}
-                          >
-                            {truncateText(post.caption, 20)}
-                          </button>
-                        ))}
-                        {remainingCount > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => openPostModal(dayPosts[0])}
-                            className="block w-full rounded-md bg-muted px-2 py-1 text-left text-[11px] font-medium text-muted-foreground"
-                          >
-                            +{remainingCount} mas
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              </>
-            )}
-          </div>
-
-          <div
-            className={cn(
-              "hidden md:block",
-              viewMode === "semanal" && "md:block",
-              viewMode === "mensual" && "md:hidden"
-            )}
-          >
-            {weekPosts.length === 0 ? (
-              <EmptyState onCreatePost={goToNewPost} />
-            ) : (
-              <>
-              <div className="grid grid-cols-[72px_repeat(7,minmax(0,1fr))]">
-                <div />
-                {weekDays.map((day) => (
-                  <div
-                    key={`week-header-${day.toISOString()}`}
-                    className="border-b border-l border-border bg-surface px-2 py-3 text-center"
-                  >
-                    <p className="text-xs font-semibold text-muted-foreground">
-                      {capitalize(format(day, "EEE", { locale: es }))}
-                    </p>
-                    <p className={cn("text-sm text-foreground", isToday(day) && "font-semibold text-primary")}>
-                      {format(day, "d")}
-                    </p>
-                  </div>
-                ))}
-
-                {WEEK_HOURS.map((hour) => (
-                  <React.Fragment key={`hour-${hour}`}>
-                    <div className="border-b border-border px-2 py-3 text-right text-xs text-muted-foreground">
-                      {`${hour}:00`}
-                    </div>
-                    {weekDays.map((day) => {
-                      const postsAtSlot = filteredPosts.filter(
-                        (post) =>
-                          isSameDay(post.scheduledAt, day) &&
-                          getHours(post.scheduledAt) === hour
-                      )
-
-                      return (
-                        <div
-                          key={`${day.toISOString()}-${hour}`}
-                          className="min-h-[66px] border-b border-l border-border p-1.5"
-                        >
-                          <div className="space-y-1.5">
-                            {postsAtSlot.map((post) => (
-                              <button
+                          </div>
+                          <div className="mt-2 space-y-1.5">
+                            {dayPosts.slice(0, 2).map((post) => (
+                              <span
                                 key={post.id}
-                                type="button"
-                                onClick={() => openPostModal(post)}
-                                className={cn(
-                                  "w-full rounded-lg border p-2 text-left",
-                                  statusConfig[post.status].cardClassName
-                                )}
+                                className={`block truncate rounded-full px-2.5 py-1 text-[11px] font-semibold ${platformPillClasses(post.platform)}`}
                               >
-                                <div className="mb-1 flex items-center gap-2">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(post.account)}&backgroundColor=0095b6&textColor=ffffff`}
-                                    alt={post.account}
-                                    className="h-5 w-5 rounded-full"
-                                  />
-                                  <p className="truncate text-[11px] font-semibold">
-                                    {post.account}
-                                  </p>
-                                </div>
-                                <p className="truncate text-[11px]">
-                                  {truncateText(post.caption, 30)}
-                                </p>
-                              </button>
+                                {post.title}
+                              </span>
                             ))}
                           </div>
-                        </div>
-                      )
-                    })}
-                  </React.Fragment>
-                ))}
-              </div>
-              </>
-            )}
-          </div>
-        </>
-      </section>
-
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-lg rounded-2xl p-0" showCloseButton>
-          {selectedPost ? (
-            <div className="space-y-4 p-5">
-              <DialogHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <DialogTitle>{selectedPost.account}</DialogTitle>
-                  <Badge variant={statusConfig[selectedPost.status].badgeVariant}>
-                    {statusConfig[selectedPost.status].label}
-                  </Badge>
-                </div>
-                <DialogDescription>
-                  Detalle de publicacion programada
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="overflow-hidden rounded-xl border border-border bg-surface">
-                {selectedPost.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={selectedPost.imageUrl}
-                    alt="Imagen de publicacion"
-                    className="aspect-square w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex aspect-square items-center justify-center text-muted-foreground">
-                    <ImageIcon className="h-10 w-10" />
-                  </div>
-                )}
-              </div>
-
-              <p className="rounded-xl bg-surface p-3 text-sm text-foreground">
-                {selectedPost.caption}
-              </p>
-
-              <p className="text-sm text-muted-foreground">
-                Programado para el{" "}
-                <span className="font-medium text-foreground">
-                  {format(
-                    selectedPost.scheduledAt,
-                    "EEEE d 'de' MMMM 'de' yyyy 'a las' HH:mm",
-                    { locale: es }
-                  )}
-                </span>
-              </p>
-
-              <Separator />
-
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => router.push("/nueva-publicacion")}
-                >
-                  Editar
-                </Button>
-                <Button
-                  variant="destructive"
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={handleDeletePost}
-                >
-                  Eliminar
-                </Button>
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-    </div>
-  )
+          ) : (
+            <div className="grid gap-3 xl:grid-cols-7">
+              {weekDays.map((date, index) => {
+                const dateLabel = `${date.getDate()} ${MONTH_NAMES[date.getMonth()].slice(0, 3)}`;
+                const isToday =
+                  date.getDate() === now.getDate() &&
+                  date.getMonth() === now.getMonth() &&
+                  date.getFullYear() === now.getFullYear();
+                return (
+                <div
+                  key={index}
+                  className={`rounded-xl border p-3 ${isToday ? "border-primary bg-[#f0fafc]" : "border-[#e8f4f7] bg-[#fbfdfe]"}`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    {dayLabels[index]}
+                  </p>
+                  <p className={`mt-1 text-sm font-semibold ${isToday ? "text-primary" : "text-foreground"}`}>{dateLabel}</p>
+
+                  <div className="mt-4 space-y-3">
+                    {weeklyPosts
+                      .filter((post) => post.dayIndex === index)
+                      .map((post) => (
+                        <article
+                          key={`${post.title}-${post.time}`}
+                          className={`rounded-xl p-3 ${platformPillClasses(post.platform)}`}
+                        >
+                          <p className="text-xs font-bold">{post.time}</p>
+                          <p className="mt-1 text-sm font-semibold">{post.title}</p>
+                        </article>
+                      ))}
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function platformPillClasses(platform: Platform) {
+  if (platform === "instagram") {
+    return "bg-[#fce7f3] text-[#9d174d]";
+  }
+  if (platform === "facebook") {
+    return "bg-[#dbeafe] text-[#1e40af]";
+  }
+  if (platform === "tiktok") {
+    return "bg-[#f3f4f6] text-[#111827]";
+  }
+  return "bg-[#dbeafe] text-[#1e3a5f]";
+}
+
+function ChevronLeftIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="m14.5 6.5-5 5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="m9.5 6.5 5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
